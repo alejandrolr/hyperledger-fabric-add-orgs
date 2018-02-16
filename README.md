@@ -168,5 +168,6 @@ In summary:
 12) Install new chaincode version onto ORG1 and ORG2.
 13) Use ORG1 or ORG2 to upgrade the chaincode to include ORG3 in the endorsement policy.
 
-```
-
+Author:
+---
+Alejandro M. López Rodríguez, based on official documentation.
