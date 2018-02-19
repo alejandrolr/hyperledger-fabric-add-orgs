@@ -2,7 +2,7 @@
 Code for adding new organizations to Hyperledger Fabric
 
 Firstly, we need to prepare the scenary (generate crypto material and raise the network):
-```
+```bash
 ./byfn.sh -m down
 ./byfn.sh -m generate
 ./byfn.sh -m up
@@ -17,30 +17,30 @@ Our desired state is the following:
 ![final_snapshot](lab_final.png)
 
 In order to do this, we need to generate the crypto material for the third org:
-```
+```bash
 cd org3-artifacts
 cryptogen generate --config=./org3-crypto.yaml
 ```
 > NOTE: add the fabric tools (cryptogen, configtxgen, ...) to your PATH
 
 Now export your FABRIC_CFG_PATH in order to have your configtx.yaml file for the Org3 (folder org3-artifacts):
-```
+```bash
 export FABRIC_CFG_PATH=$PWD
 ```
 
 And then, perform the following commands to configure our 3rd Organization; and copy the orderer crypto config into the crypto material of the Org3:
-```
+```bash
 configtxgen -printOrg Org3MSP > ../channel-artifacts/org3.json
 cp -r ../crypto-config/ordererOrganizations crypto-config
 ```
 
 Now let's jump into the cli container (check the TIMEOUT to maintain the cli alive) and do the updates on the channel:
-```
+```bash
 docker exec -it cli bash
 ```
 
 Inside, install jq and start the configtxlator tool to reconfigure our topology:
-```
+```bash
 apt update && apt install jq
 configtxlator start &
 # (Press enter to continue normally)
@@ -50,7 +50,7 @@ export CHANNEL_NAME=mychannel
 ```
 
 Now start the funny and tedious reconfiguration (inside the cli):
-```
+```bash
 # fetch the configuration block (most recent config block)
 peer channel fetch config config_block.pb -o orderer.example.com:7050 -c $CHANNEL_NAME --tls --cafile $ORDERER_CA
 
@@ -82,7 +82,7 @@ peer channel signconfigtx -f config_update_in_envelope.pb
 ```
 
 Now, go to the Org2 (inside the cli), and update the configuration (if you have more Org you must ensure this step per Org)
-```
+```bash
 export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/users/Admin\@org2.example.com/msp/
 export CORE_PEER_ADDRESS=peer0.org2.example.com:7051
 export CORE_PEER_LOCALMSPID="Org2MSP"
@@ -90,20 +90,16 @@ export CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric
 peer channel update -f config_update_in_envelope.pb -c $CHANNEL_NAME -o orderer.example.com:7050 --tls true --cafile $ORDERER_CA
 ```
 
-Raise the 2 peers for the Org3, (and a Org3cli, not compulsory):
-```
+Raise the 2 peers for the Org3, (and a Org3cli, not compulsory, but useful to have all the crypto material for the third org):
+```bash
 docker-compose -f docker-compose-org3.yaml up
 ```
 
-Go to the cli again and join the new peers to the existing channel "mychannel" for the Org3 (you can use the Org3cli in order to avoid to export all the env variables):
-```
-docker exec -it cli bash
-export CORE_PEER_ADDRESS=peer0.org3.example.com:7051
-export CORE_PEER_LOCALMSPID=Org3MSP
-export CORE_PEER_TLS_CERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/server.crt
-export CORE_PEER_TLS_KEY_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/server.key
-export CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
-export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp
+Go to the **Org3cli** and join the new peers to the existing channel "mychannel" for the Org3 (you can use the Org3cli in order to avoid to export all the env variables):
+```bash
+docker exec -it Org3cli bash
+export ORDERER_CA=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+export CHANNEL_NAME=mychannel
 
 # When you join a channel, you must start on the genesis block. We do this using the fetch command. Notice the 0, that is selecting the earliest block aka the genesis block
 peer channel fetch 0 mychannel.block -o orderer.example.com:7050 -c $CHANNEL_NAME --tls --cafile $ORDERER_CA
@@ -115,14 +111,14 @@ export CORE_PEER_ADDRESS=peer1.org3.example.com:7051
 peer channel join -b mychannel.block
 ```
 Back to peer0 and install the chaincode (version 2.0). 
-```
+```bash
 export CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
 export CORE_PEER_ADDRESS=peer0.org3.example.com:7051
 peer chaincode install -n mycc -v 2.0 -p github.com/chaincode/chaincode_example02/go/
 ```
 
-We have to define ORG3 as part of our emdorsement policy, so we'll update the version to 2.0 in all of our organizations (inside the cli):
-```
+We have to define ORG3 as part of our emdorsement policy, so we'll update the version to 2.0 in all of our organizations (inside the original **cli**):
+```bash
 # in Org1
 export CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org1.example.com/users/Admin\@org1.example.com/msp/
 export CORE_PEER_ADDRESS=peer0.org1.example.com:7051
@@ -138,15 +134,15 @@ export CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric
 peer chaincode install -n mycc -v 2.0 -p github.com/chaincode/chaincode_example02/go/
 ```
 
-Now we have all the version 2's installed on peer0 of ORG1, ORG2 and ORG3. We are now ready to upgrade:
-```
+Now we have the version 2's installed on peer0 of ORG1, ORG2 and ORG3. We are now ready to upgrade:
+```bash
 peer chaincode upgrade -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc -v 2.0 -c '{"Args":["init","a","90","b","210"]}' -P "OR('Org1MSP.member', 'Org2MSP.member', 'Org3MSP.member')"
 ```
 > NOTE: we are rewriting our initial state, if we want to preserve the state of version 1 we have to create an init method that doesn't altere the ledger!
 
 TEST:
-```
-# go to Org3 and execute the query:
+```bash
+# go to Org3cli and execute the query:
 peer chaincode query -C $CHANNEL_NAME -n mycc -c '{"Args":["query","a"]}'
 # or the following invoke:
 peer chaincode invoke -o orderer.example.com:7050 --tls $CORE_PEER_TLS_ENABLED --cafile $ORDERER_CA -C $CHANNEL_NAME -n mycc -c '{"Args":["invoke","a","b","10"]}
